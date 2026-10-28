@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>你确定要打开吗 · 交互原型</title>
+<style>
+  :root{
+    --ink:#0E1116; --card:#181D25; --accent:#E8632A;
+    --text:#F2F4F7; --dim:#8A93A0; --danger:#E24A4A;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:radial-gradient(1200px 800px at 50% -10%, #1a2030 0%, #080a0e 60%);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;color:var(--text);
+  }
+
+  .phone{
+    width:392px;height:812px;max-height:calc(100vh - 48px);
+    background:var(--ink);border-radius:42px;
+    border:1px solid #262c36;
+    box-shadow:0 40px 90px rgba(0,0,0,.65), 0 0 0 10px #14181e;
+    display:flex;flex-direction:column;overflow:hidden;position:relative;
+  }
+  @media (max-width:640px){
+    body{padding:0;}
+    .phone{width:100%;height:100vh;max-height:100vh;border-radius:0;border:none;box-shadow:none;}
+  }
+
+  .bar{
+    height:44px;flex:0 0 44px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 22px;
+    font-size:12px;color:var(--dim);font-weight:600;letter-spacing:.3px;
+  }
+
+  #app{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 20px 8px;scrollbar-width:none;}
+  #app::-webkit-scrollbar{display:none;}
+
+  /* ---------- 首页 ---------- */
+  .h1{font-size:36px;line-height:1.12;font-weight:800;margin:10px 0 10px;letter-spacing:-.5px;}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:22px;}
+
+  .stat{
+    background:var(--card);border-radius:16px;padding:16px 18px;
+    display:flex;align-items:center;gap:12px;margin-bottom:22px;
+  }
+  .stat .num{font-size:34px;font-weight:800;color:var(--accent);line-height:1;}
+  .stat .t{font-size:15px;font-weight:600;}
+  .stat .s{font-size:12px;color:var(--dim);margin-top:5px;line-height:1.4;}
+
+  .label{font-size:11px;color:var(--dim);letter-spacing:.6px;margin-bottom:10px;font-weight:600;}
+
+  .row{
+    background:var(--card);border-radius:16px;padding:13px 15px;
+    display:flex;align-items:center;gap:13px;margin-bottom:9px;
+    cursor:pointer;transition:transform .12s ease, background .12s ease;
+    border:1px solid transparent;
+  }
+  .row:active{transform:scale(.985);background:#1d232c;}
+
+  .icon{
+    width:44px;height:44px;border-radius:12px;flex:0 0 44px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:19px;font-weight:800;color:#fff;
+  }
+  .row .name{font-size:15.5px;font-weight:600;}
+  .row .desc{font-size:11.5px;color:var(--dim);margin-top:3px;}
+  .row .go{margin-left:auto;color:var(--accent);font-size:17px;}
+
+  /* ---------- 迷宫 ---------- */
+  .topline{display:flex;align-items:center;gap:10px;margin:8px 0 12px;}
+  .back{
+    color:var(--dim);font-size:19px;cursor:pointer;padding:4px 8px 4px 0;
+    border:none;background:none;font-family:inherit;
+  }
+  .layers{font-size:14.5px;font-weight:700;}
+  .target{margin-left:auto;font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px;}
+  .mini{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;}
+
+  .dots{display:flex;gap:4px;margin-bottom:20px;}
+  .dot{flex:1;height:3px;border-radius:2px;background:rgba(138,147,160,.2);transition:background .3s;}
+  .dot.on{background:var(--accent);}
+
+  .find{font-size:11.5px;color:var(--dim);}
+  .findword{font-size:21px;font-weight:800;margin:5px 0 4px;}
+  .findhint{font-size:12px;color:var(--dim);margin-bottom:16px;}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;}
+
+  /* 迷宫页：让底部提示贴在屏幕下方，中间空白自然分布 */
+  .mz{display:flex;flex-direction:column;min-height:100%;}
+  .mz .gap{flex:1;min-height:20px;}
+
+  .cell{
+    background:var(--card);border-radius:14px;padding:14px 4px 11px;
+    display:flex;flex-direction:column;align-items:center;gap:7px;
+    cursor:pointer;border:1px solid transparent;
+    transition:transform .1s ease, background .1s ease, border-color .15s;
+    user-select:none;
+  }
+  .cell:active{transform:scale(.94);background:#1d232c;}
+  .cell.wrong{
+    background:rgba(226,74,74,.14);border-color:var(--danger);
+    animation:shake .4s ease;
+  }
+  @keyframes shake{
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-5px)}
+    40%{transform:translateX(5px)}
+    60%{transform:translateX(-3px)}
+    80%{transform:translateX(3px)}
+  }
+
+  .folder{
+    width:48px;height:36px;border-radius:7px;position:relative;
+    background:rgba(232,99,42,.22);margin-top:6px;
+  }
+  .folder::before{
+    content:'';position:absolute;top:-5px;left:0;
+    width:42%;height:7px;border-radius:4px 4px 0 0;
+    background:rgba(232,99,42,.4);
+  }
+  .cell.wrong .folder{background:rgba(226,74,74,.32);}
+  .cell.wrong .folder::before{background:rgba(226,74,74,.5);}
+
+  .cell .cap{
+    font-size:11.5px;text-align:center;line-height:1.2;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    max-width:100%;padding:0 2px;color:var(--text);
+  }
+  .cell.wrong .cap{color:var(--danger);}
+
+  .toast{
+    text-align:center;font-size:12.5px;height:52px;
+    display:flex;align-items:center;justify-content:center;
+    color:rgba(138,147,160,.55);
+  }
+  .toast.err{color:var(--danger);}
+  .toast.load{color:var(--accent);}
+
+  /* ---------- 终局 ---------- */
+  .gate{
+    display:flex;flex-direction:column;align-items:center;
+    min-height:100%;padding-top:40px;text-align:center;
+  }
+  .gate .big{width:78px;height:78px;border-radius:20px;font-size:32px;margin-bottom:22px;}
+  .gate h2{font-size:25px;line-height:1.34;margin:0 0 12px;font-weight:800;}
+  .gate .meta{font-size:12px;color:var(--dim);margin-bottom:32px;}
+  .qbox{
+    background:var(--card);border-radius:16px;padding:18px;
+    font-size:14.5px;line-height:1.6;color:rgba(242,244,247,.85);
+    width:100%;margin-bottom:auto;
+  }
+  .hold{
+    width:100%;height:62px;border-radius:31px;margin-top:36px;
+    display:flex;align-items:center;justify-content:center;
+    position:relative;overflow:hidden;
+    background:rgba(232,99,42,.2);color:var(--dim);
+    font-size:15px;font-weight:700;cursor:not-allowed;
+    transition:background .3s, color .3s;
+    user-select:none;touch-action:none;
+  }
+  .hold.ready{background:var(--accent);color:#fff;cursor:pointer;}
+  .hold .fill{
+    position:absolute;left:0;top:0;bottom:0;width:0%;
+    background:rgba(255,255,255,.26);
+  }
+  .hold span{position:relative;z-index:2;}
+
+  .cancel{
+    margin:14px 0 30px;padding:12px 22px;font-size:14px;color:var(--dim);
+    background:none;border:none;font-family:inherit;cursor:pointer;
+  }
+
+  /* ---------- 打开成功 ---------- */
+  .opened{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100%;text-align:center;gap:14px;padding-bottom:60px;
+  }
+  .check{
+    width:76px;height:76px;border-radius:50%;background:rgba(53,179,126,.15);
+    display:flex;align-items:center;justify-content:center;
+    font-size:34px;color:#35B37E;
+  }
+  .hint{font-size:11.5px;color:rgba(138,147,160,.55);line-height:1.6;margin-top:26px;text-align:center;}
+  .ghost{
+    background:none;border:1px solid rgba(232,99,42,.45);color:var(--accent);
+    padding:11px 20px;border-radius:12px;font-size:13.5px;
+    font-family:inherit;cursor:pointer;font-weight:600;
+  }
+
+  .fade{animation:fade .3s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="bar"><span>22:41</span><span>▲ 88%</span></div>
+  <div id="app"></div>
+</div>
+
+<script>
+/* =========================================================
+   1. 状态
+   ========================================================= */
+const S = {
+  screen: 'home',          // home | maze | gate | opened
+  todayCount: 0,
+  keyword: '番茄',
+  baseDepth: 3,
+  calm: 10,
+  reason: '现在是几点？这件事真的比它更重要吗？',
+  apps: [
+    { id:'wzry', name:'王者荣耀', color:'#C9302C', letter:'王' },
+    { id:'dy',   name:'抖音',     color:'#161823', letter:'抖' },
+    { id:'ys',   name:'原神',     color:'#2E6FB7', letter:'原' }
+  ],
+  current: null,
+  // 迷宫运行时
+  depth: 1, total: 0, slots: [], wrongIdx: -1, loading: false,
+  // 终局运行时
+  left: 0, holdPct: 0, holding: false
+};
+
+const app = document.getElementById('app');
+
+/* =========================================================
+   2. 迷宫生成（和 Kotlin 版逻辑一致）
+   ========================================================= */
+const SUFFIX = ['钟','酱','汁','派','小组','盒子','计划','侠','日记','森林','工厂','小站','手册','清单','们'];
+const PREFIX = ['小','老','大','新','我的','那个','真','假'];
+const FILLER = ['西红柿','土豆','白菜','洋葱','南瓜','青椒','香菇','冬瓜','芹菜','生菜','豆腐','茄子'];
+
+function decoys(kw, n){
+  const pool = new Set();
+  SUFFIX.forEach(s => pool.add(kw + s));
+  PREFIX.forEach(p => pool.add(p + kw));
+  if (kw.length >= 2){
+    pool.add(kw.slice(0, -1));
+    pool.add(kw.slice(1));
+    pool.add(kw[0] + kw[kw.length-1]);
+  }
+  if (kw.length >= 3) pool.add(kw[0] + kw.slice(2));
+  FILLER.forEach(f => pool.add(f));
+  pool.delete(kw);
+  const arr = [...pool];
+  for (let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, n);
+}
+
+function buildLayer(kw, count){
+  const pathPos = Math.floor(Math.random() * count);
+  const d = decoys(kw, count - 1);
+  let di = 0;
+  return Array.from({length: count}, (_, i) =>
+    i === pathPos ? { text: kw, isPath: true } : { text: d[di++], isPath: false }
+  );
+}
+
+function totalDepth(base, cnt){
+  return Math.max(1, Math.min(15, base + Math.min(cnt, 5)));
+}
+
+function cellCountFor(depth){
+  if (depth <= 2) return 6;
+  if (depth <= 4) return 9;
+  return 12;
+}
+
+/* =========================================================
+   3. 渲染
+   ========================================================= */
+function render(){
+  if (S.screen === 'home')   return renderHome();
+  if (S.screen === 'maze')   return renderMaze();
+  if (S.screen === 'gate')   return renderGate();
+  if (S.screen === 'opened') return renderOpened();
+}
+
+function renderHome(){
+  const plan = totalDepth(S.baseDepth, S.todayCount);
+  app.innerHTML = `
+    <div class="fade">
+      <div class="h1">你确定要<br>打开吗</div>
+      <div class="sub">把挡不住的东西，塞进很深的地方。</div>
+
+      <div class="stat">
+        <div style="flex:1">
+          <div class="t">今天想开 ${S.todayCount} 次</div>
+          <div class="s">${S.todayCount === 0
+            ? `现在进入要穿 ${plan} 层`
+            : `想开得越多，门越厚 —— 这次要穿 ${plan} 层`}</div>
+        </div>
+        <div class="num">${plan}</div>
+      </div>
+
+      <div class="label">受管控的应用</div>
+      ${S.apps.map(a => `
+        <div class="row" data-action="enter" data-id="${a.id}">
+          <div class="icon" style="background:${a.color}">${a.letter}</div>
+          <div>
+            <div class="name">${a.name}</div>
+            <div class="desc">进入需要穿过多层文件夹</div>
+          </div>
+          <div class="go">→</div>
+        </div>
+      `).join('')}
+
+      <div class="hint">
+        这是浏览器里的交互原型，用来确认手感。<br>
+        最终形态见 android/ 工程。<br><br>
+        当前版本只管控「从这里进入」——<br>
+        从桌面直接点图标仍然可以绕过。
+      </div>
+      <div style="height:28px"></div>
+    </div>
+  `;
+}
+
+function renderMaze(){
+  const dots = Array.from({length: S.total}, (_, i) =>
+    `<div class="dot ${i < S.depth ? 'on' : ''}"></div>`).join('');
+
+  const cells = S.slots.map((s, i) => `
+    <div class="cell ${S.wrongIdx === i ? 'wrong' : ''}" data-action="cell" data-i="${i}">
+      <div class="folder"></div>
+      <div class="cap">${s.text}</div>
+    </div>
+  `).join('');
+
+  let toast = `<div class="toast">点错会重新洗牌，位置是记不住的</div>`;
+  if (S.loading)      toast = `<div class="toast load">正在展开…</div>`;
+  else if (S.wrongIdx >= 0) toast = `<div class="toast err">这里没有你要找的东西</div>`;
+
+  app.innerHTML = `
+    <div class="fade mz">
+      <div class="topline">
+        <button class="back" data-action="home">←</button>
+        <div class="layers">第 ${S.depth} / ${S.total} 层</div>
+        <div class="target">
+          <div class="mini" style="background:${S.current.color}">${S.current.letter}</div>
+          ${S.current.name}
+        </div>
+      </div>
+
+      <div class="dots">${dots}</div>
+
+      <div class="find">找到并进入</div>
+      <div class="findword">${S.keyword}</div>
+      <div class="findhint">这个名字的文件夹</div>
+
+      <div class="grid">${cells}</div>
+      <div class="gap"></div>
+      ${toast}
+    </div>
+  `;
+}
+
+function renderGate(){
+  app.innerHTML = `
+    <div class="gate fade">
+      <div class="icon big" style="background:${S.current.color}">${S.current.letter}</div>
+      <h2>你确定要打开<br>${S.current.name} 吗</h2>
+      <div class="meta">你已经穿过 ${S.total} 层，今天第 ${S.todayCount} 次想开它</div>
+      <div class="qbox">${S.reason}</div>
+      <div class="hold ${S.left <= 0 ? 'ready' : ''}" id="hold">
+        <div class="fill" style="width:${S.holdPct}%"></div>
+        <span>${S.left > 0 ? `先安静 ${S.left} 秒` : (S.holdPct > 5 ? '别松手…' : '按住 3 秒，打开它')}</span>
+      </div>
+      <button class="cancel" data-action="home">算了</button>
+    </div>
+  `;
+  bindHold();
+}
+
+function renderOpened(){
+  app.innerHTML = `
+    <div class="opened fade">
+      <div class="check">✓</div>
+      <div style="font-size:19px;font-weight:800">已打开 ${S.current.name}</div>
+      <div style="font-size:12.5px;color:var(--dim);line-height:1.7">
+        这是原型，不会真的启动应用。<br>
+        在安卓版里，这里会 launch 真实 App。
+      </div>
+      <button class="ghost" style="margin-top:16px" data-action="home">回到首页</button>
+    </div>
+  `;
+}
+
+/* =========================================================
+   4. 交互
+   ========================================================= */
+function enterMaze(id){
+  const a = S.apps.find(x => x.id === id);
+  S.current = a;
+  // 顺序很重要：先用旧次数算层数，再 +1
+  S.total = totalDepth(S.baseDepth, S.todayCount);
+  S.todayCount += 1;
+
+  S.depth = 1;
+  S.wrongIdx = -1;
+  S.loading = false;
+  S.slots = buildLayer(S.keyword, cellCountFor(1));
+  S.screen = 'maze';
+  render();
+}
+
+function clickCell(i){
+  if (S.loading || S.wrongIdx >= 0) return;
+  const slot = S.slots[i];
+
+  if (!slot.isPath){
+    S.wrongIdx = i;
+    render();
+    setTimeout(() => {
+      S.wrongIdx = -1;
+      S.slots = buildLayer(S.keyword, cellCountFor(S.depth)); // 重新洗牌
+      render();
+    }, 650);
+    return;
+  }
+
+  S.loading = true;
+  render();
+  setTimeout(() => {
+    S.loading = false;
+    if (S.depth >= S.total){
+      S.screen = 'gate';
+      S.left = S.calm;
+      S.holdPct = 0;
+      render();
+      tickCalm();
+    } else {
+      S.depth += 1;
+      S.slots = buildLayer(S.keyword, cellCountFor(S.depth));
+      render();
+    }
+  }, 700);
+}
+
+function tickCalm(){
+  if (S.screen !== 'gate' || S.left <= 0) return;
+  setTimeout(() => {
+    if (S.screen !== 'gate') return;
+    S.left -= 1;
+    if (S.left <= 0) S.left = 0;
+    render();
+    if (S.left > 0) tickCalm();
+  }, 1000);
+}
+
+/* ---- 按住 3 秒 ---- */
+let rafId = null, holdStart = 0;
+
+function bindHold(){
+  const el = document.getElementById('hold');
+  if (!el) return;
+  el.addEventListener('pointerdown', e => {
+    if (S.left > 0 || S.holding) return;
+    e.preventDefault();
+    S.holding = true;
+    holdStart = performance.now();
+    const step = () => {
+      if (!S.holding) return;
+      const pct = Math.min(100, ((performance.now() - holdStart) / 3000) * 100);
+      S.holdPct = pct;
+      const fill = el.querySelector('.fill');
+      const span = el.querySelector('span');
+      if (fill) fill.style.width = pct + '%';
+      if (span && pct > 5) span.textContent = '别松手…';
+      if (pct >= 100){
+        S.holding = false;
+        cancelAnimationFrame(rafId);
+        S.screen = 'opened';
+        render();
+        return;
+      }
+      rafId = requestAnimationFrame(step);
+    };
+    rafId = requestAnimationFrame(step);
+  });
+}
+
+function endHold(){
+  if (!S.holding) return;
+  S.holding = false;
+  cancelAnimationFrame(rafId);
+  S.holdPct = 0;
+  if (S.screen === 'gate') render();
+}
+
+document.addEventListener('pointerup', endHold);
+document.addEventListener('pointercancel', endHold);
+
+/* ---- 事件委托 ---- */
+app.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === 'enter') enterMaze(el.dataset.id);
+  if (a === 'cell')  clickCell(Number(el.dataset.i));
+  if (a === 'home'){ S.screen = 'home'; S.holding = false; S.holdPct = 0; render(); }
+});
+
+render();
+
+/* 调试入口：加 ?demo=maze 或 ?demo=gate 直接跳到指定页面，方便截图/对照 */
+(function(){
+  const d = new URLSearchParams(location.search).get('demo');
+  if (d === 'maze'){ enterMaze('wzry'); }
+  if (d === 'gate'){
+    enterMaze('wzry');
+    S.screen = 'gate';
+    S.left = 0;
+    S.holdPct = 0;
+    render();
+  }
+})();
+
+</script>
+</body>
+</html>

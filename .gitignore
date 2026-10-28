@@ -1,17 +1,27 @@
 # Gradle / Android
 android/.gradle/
+android/.kotlin/
 android/build/
 android/app/build/
 android/local.properties
 android/captures/
 android/.externalNativeBuild/
 android/.cxx/
+*.apk
+*.aab
+*.ap_
+output-metadata.json
 
 # IDE
 .idea/
 *.iml
 .vscode/
+*.hprof
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# 注意：android/gradle/wrapper/gradle-wrapper.jar 必须提交，
+# 否则 clone 下来无法构建。这里故意不写 *.jar 规则。

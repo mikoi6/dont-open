@@ -1,289 +1,213 @@
-# 你确定要打开吗（dont-open）
+<div align="center">
 
-一个用「无限层文件夹」给打开游戏这件事加摩擦的安卓小工具。
+# 你确定要打开吗
 
----
+**把最想打开的那个 App，藏进很深的地方。**
 
-## 先说清楚四件事，避免你白折腾
+一个用「无限层文件夹」给冲动加摩擦的 Android 小工具。<br>
+不做任何禁止，只把「打开」的成本从 1 秒提高到 30 秒。
 
-**1. 我只堵住了一半的门。**
-这个 App 只管「从这个 App 里点进去」的路径。你如果从手机桌面直接点游戏图标，**它拦不住**。堵住这条要靠无障碍服务，属于 v2。
+![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)
+![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
+![minSdk](https://img.shields.io/badge/minSdk-26-3DDC84?logo=android&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-2EA44F)
 
-**2. 我在这里没法编译验证。**
-当前环境的 Java 是 1.8，没有 Android SDK、没有 Gradle。所以 `android/` 里的代码我一行都没跑过编译。我验证的是两件能验证的事：
-- 迷宫生成算法的 5 条不变量（7000 次随机生成全部通过，见 `prototype/maze-test.js`）
-- 原型的 JS 语法
+<img src="docs/screenshots/1-home.png" width="230" alt="首页">
+<img src="docs/screenshots/2-maze.png" width="230" alt="迷宫">
+<img src="docs/screenshots/3-gate.png" width="230" alt="最后一关">
 
-Compose 部分如果报错，大概率是拼写/import 级别的，数量应该很少。**第一条编译错误请自己先读一遍再问我**，这是你该练的东西。
-
-**3. 这个工具真正的敌人是你自己，不是代码。**
-所有自律工具最后都死在同一个地方：用户觉得烦，然后卸载。所以「摩擦」必须**刚好让人烦到放弃一次，又不至于烦到卸载**。这是产品问题，不是技术问题。
-
-**4. 你已经拥有的东西比你以为的多。**
-你有 Java 基础，Kotlin 和 Java 在语法上差不多；你有前端基础，Compose 的声明式写法和 React 一个思路。这个项目不需要你学新语言，只需要学「安卓的权限模型」和「Compose 的状态」。
+</div>
 
 ---
 
-## 目录结构
+## 它解决什么问题
+
+你想少玩某个游戏，靠意志力失败了第一百次。
+
+市面上的自律工具都在做同一件事：**禁止**。然后你想办法绕过它——因为它和你的欲望是对立的。
+
+这个工具做的是另一件事：**加摩擦**。
+
+它不拦你，它只是把那个 App 塞进一个很深的文件夹迷宫里。你每次想打开，都必须：
+
+- 一层一层往下点，**每一层**都要在十几个形近词里找到唯一正确的那个
+- 点错就整层重新洗牌，位置记不住
+- 走到最后，等 10 秒冷静倒计时，按住按钮 3 秒不松手
+- 屏幕上还写着一句你自己设的问题
+
+**它拦不住你，但它给了你 30 秒的清醒时间。** 而冲动，通常撑不过 30 秒。
+
+> 这不是家长控制软件，也不是戒断治疗工具。它只是一个把「手指比脑子快」这个 bug 打上补丁的小玩意。
+
+---
+
+## 摩擦是怎么设计的
+
+这是整个项目唯一值得看的部分。四个机制叠加，每个都有明确的设计取舍：
+
+| 机制 | 做法 | 为什么这么设计 |
+|:--|:--|:--|
+| **形近词迷宫** | 口令词是「番茄」，干扰格是「番茄酱 / 小番茄 / 番茄钟 / 番 / 茄」 | 摩擦来自**视觉搜索**，不来自运气。纯随机猜谜会让人卡死，而卡死的结局不是戒断，是卸载 |
+| **错误重洗** | 点错一格，整层重新打乱 | 破坏肌肉记忆。你不能靠「第三行第二个」通关，每次都得重新看 |
+| **递增层数** | `层数 = 基础层数 + min(今日已试次数, 5)` | 固定难度会被**习惯化**（第三次你就麻木了），递增不会。上限 5 是为了防止某个放纵日穿 20 层然后愤怒卸载 |
+| **三重终局** | 冷静倒计时 → 按住 3 秒 → 自省问题 | 冲动的时间尺度是 1 秒级的。把动作从「点一下」拉长到「持续 13 秒」，冲动自己就散了 |
+
+**一个关键的反直觉点**：最后的「按住 3 秒」不是仪式感，是物理上让你必须保持一个动作。人在冲动时能完成一次点击，但很难完成一组持续的、需要耐心的动作。
+
+---
+
+## 功能
+
+- 📁 **无限层文件夹** — 层数可调，还能随当天打开次数自动加厚
+- 🔤 **口令词迷宫** — 自定义口令词，干扰项由形近词自动生成
+- ⏳ **三重终局** — 冷静倒计时 / 长按解锁 / 自定义自省问题
+- 📊 **今日计数** — 记录你今天想开几次，跨天自动归零
+- 🎨 **单文件无依赖** — 纯 Compose，不联网、不上传、无广告、无账号
+
+---
+
+## 快速开始
+
+### 方式一：先玩网页原型（30 秒，不用装任何东西）
+
+用浏览器打开 [`prototype/index.html`](prototype/index.html)。
+
+这是纯前端的交互原型，逻辑和 Android 版一致，用来先确认手感。觉得有意思再往下走。
+
+> 小技巧：加 `?demo=maze` 直接跳到迷宫页，`?demo=gate` 直接看最后一关。
+
+### 方式二：自己构建 APK
+
+**环境要求**：JDK 17+、Android SDK Platform 35、Android Studio Ladybug 或更新。
+
+```bash
+git clone https://github.com/mikoi6/dont-open.git
+cd dont-open/android
+
+# macOS / Linux
+./gradlew assembleDebug
+
+# Windows
+gradlew.bat assembleDebug
+```
+
+产物在 `app/build/outputs/apk/debug/app-debug.apk`。
+
+用数据线连手机后也可以直接安装：
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+> 首次构建前，Android Studio 会自动生成 `local.properties` 写入你的 SDK 路径；命令行构建则需要设置 `ANDROID_HOME` 环境变量。
+
+### 方式三：用 Android Studio 打开
+
+`File → Open` → 选择 `android/` 目录（**不是仓库根目录**）→ 等 Gradle Sync 完成 → Run。
+
+---
+
+## 怎么用
+
+1. **把应用藏起来** — 首页点「＋ 把应用藏起来」，勾选你想管控的 App（游戏、短视频…）
+2. **设一个口令词** — 展开「设置」，填一个你记得住的词。它会出现在每一层的迷宫里
+3. **写一句自省问题** — 换成对你真正有效的，比如「你今天说要写的代码写完了吗」
+4. **调摩擦强度** — 基础层数越高越难；冷静倒计时越长越难
+
+之后每次想打开受管控的应用，都要从这个 App 里走一遍迷宫。
+
+### 可调参数
+
+| 参数 | 位置 | 默认值 | 说明 |
+|:--|:--|:--|:--|
+| 口令词 | `Config.kt` → `Store.keyword()` | `番茄` | 迷宫里的正确答案，也是唯一的提示 |
+| 基础层数 | `Store.baseDepth()` | `3` | 每次要穿过的层数基数 |
+| 冷静倒计时 | `Store.calmSec()` | `10` 秒 | 终局按钮解锁前的等待时间 |
+| 自省问题 | `Store.reason()` | 内置一句 | 终局页显示的话，**建议自己改** |
+| 每日加层上限 | `Maze.totalDepth()` | `5` | 当天想开太多次时的封顶，防止愤怒卸载 |
+| 干扰词池 | `Maze.SUFFIX / PREFIX / FILLER` | 见源码 | 中文口令词效果好；英文口令词建议自己加规则 |
+
+---
+
+## 已知限制
+
+> ⚠️ **最需要知道的一条：从手机桌面直接点图标，可以绕过这个工具。**
+
+当前版本只管控「从这个 App 里进入」的路径。桌面图标还在，直接点就进去了。
+
+这是 v1 的范围决定，不是 bug。堵住它需要用 `AccessibilityService` 监听前台窗口变化，属于 v2（见 [Roadmap](#roadmap)）。
+
+其他限制：
+
+- 只在 Android 8.0+（API 26）测试过，更高版本未做兼容性验证
+- 应用列表需要 `QUERY_ALL_PACKAGES` 权限。若打算上架 Google Play，需改用 `<queries>` 声明并说明用途
+- 图标在列表中即时加载，未做缓存，应用很多时滚动略卡
+- 数据全部存在本地 `SharedPreferences`，不联网，也不备份
+
+---
+
+## Roadmap
+
+- [x] v1 — 迷宫本体：形近词 + 递增层数 + 三重终局
+- [ ] v2 — 桌面拦截：`AccessibilityService` 检测前台应用，把用户拉回迷宫
+- [ ] v2 — 遮罩方案：用 `SYSTEM_ALERT_WINDOW` 盖住目标 App，避免「闪一下」的生硬体验
+- [ ] v3 — Launcher 模式：让自己成为桌面，目标 App 图标根本不在桌面上
+- [ ] 数据统计：今日次数 / 周趋势 / 放弃率
+- [ ] 硬核模式：卸载需要输入一串随机字符，或由朋友设置密码
+
+---
+
+## 项目结构
 
 ```
 dont-open/
+├── android/                        # Android 工程（用 Android Studio 打开这个目录）
+│   └── app/src/main/java/com/example/dontopen/
+│       ├── Config.kt               # 存储 + 迷宫生成器（核心逻辑，建议先读这个）
+│       ├── MainActivity.kt         # 入口 / 主题 / 两页路由
+│       ├── HomeScreen.kt           # 首页：选择受管应用、调参
+│       └── MazeScreen.kt           # 迷宫 + 最后一关
 ├── prototype/
-│   ├── index.html      ← 浏览器里直接打开就能玩，确认手感用
-│   └── maze-test.js    ← 迷宫算法的测试，node 跑
-├── android/            ← 真正的安卓工程
-│   ├── settings.gradle.kts
-│   ├── build.gradle.kts
-│   ├── gradle.properties
-│   ├── gradle/wrapper/gradle-wrapper.properties
-│   └── app/
-│       ├── build.gradle.kts
-│       └── src/main/
-│           ├── AndroidManifest.xml
-│           ├── java/com/example/dontopen/
-│           │   ├── Config.kt        ← 数据 + 存储 + 迷宫生成器（最重要）
-│           │   ├── MainActivity.kt  ← 入口 + 配色 + 两个页面的路由
-│           │   ├── HomeScreen.kt    ← 首页：选应用、调参数
-│           │   └── MazeScreen.kt    ← 迷宫 + 最后一关
-│           └── res/
+│   ├── index.html                  # 网页交互原型（浏览器直接打开）
+│   └── maze-test.js                # 迷宫算法不变量测试（node 运行）
+├── docs/screenshots/               # README 配图
 └── README.md
 ```
 
-**先打开 `prototype/index.html`**，玩三轮再往下读。你对摩擦的手感没有直觉之前，读代码是浪费。
+### 跑一下算法测试
 
-小技巧：`index.html?demo=maze` 直接跳到迷宫页，`?demo=gate` 直接跳到最后一关，省得每次从头点。
-
----
-
-## 五分钟跑起来
-
-### 路线 A（备用：让 Android Studio 自己生成骨架）
-
-如果你不想用我给的工程、或 Wrapper 出了意外问题，最稳的做法是**让 Android Studio 自己生成骨架，你只覆盖源码**：
-
-1. Android Studio → **New Project** → **Empty Activity**
-2. 填写：
-   - Name: `你确定？`
-   - Package name: `com.example.dontopen` ← 必须完全一致，否则要改所有文件的 `package` 行
-   - Language: **Kotlin**
-   - Minimum SDK: **API 26**
-   - Build configuration language: **Kotlin DSL**
-3. 等 Gradle sync 跑完（第一次会下依赖，比较久）
-4. **删掉**模板生成的 `app/src/main/java/com/example/dontopen/MainActivity.kt`（不删会和我给的同名文件冲突）
-5. 把 `android/app/src/main/java/com/example/dontopen/` 下的 **4 个 .kt 文件**复制进你的项目同路径目录
-6. 打开你项目的 `AndroidManifest.xml`，在 `<manifest>` 标签里、`<application>` 之前，加两行：
-
-```xml
-<uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
-    tools:ignore="QueryAllPackagesPermission" />
-<uses-permission android:name="android.permission.VIBRATE" />
-```
-
-还要在 `<manifest` 标签上加 `xmlns:tools="http://schemas.android.com/tools"`，否则 `tools:ignore` 报错。
-
-7. Run。装到手机上（模拟器读不到你真实装的游戏，用真机）。
-
-**如果 `LazyVerticalGrid` 报红**，在 `app/build.gradle.kts` 的 dependencies 里加：
-```kotlin
-implementation("androidx.compose.foundation:foundation")
-```
-
-### 路线 B（直接打开我给的工程，推荐）
-
-Gradle Wrapper（`gradle-wrapper.jar` + `gradlew` / `gradlew.bat`）已经补齐，直接开即可。
-
-1. Android Studio → Open → 选 `dont-open/android` 目录
-2. 等 Gradle sync 跑完（第一次会下依赖，比较久）
-3. Run，装到真机上
-
-**命令行构建验证**（JDK 17 环境下）：
+迷宫生成器的输出必须满足 5 条不变量（每层唯一答案、干扰词绝不等于答案、干扰词不重复……）：
 
 ```bash
-# Windows
-cd android
-gradlew.bat assembleDebug
-
-# macOS / Linux
-cd android
-./gradlew assembleDebug
+node prototype/maze-test.js
 ```
 
-产物在 `android/app/build/outputs/apk/debug/app-debug.apk`。
-
-如果 Android Studio 没有自动生成 `local.properties`（里面是 `sdk.dir=...` 指向你的 SDK），
-手动新建一个 `android/local.properties`，内容一行：
-
-```
-sdk.dir=C\:\\你的\\Android\\SDK\\路径
-```
-
-（Windows 路径里的反斜杠要写成 `\\`，冒号写成 `\:`。）
-
-### 如果「选择要藏起来的应用」里是空的
-
-Android 11+ 有包可见性限制，工程里已经加了 `<queries>` 声明（`AndroidManifest.xml`），
-正常情况下能列出所有可启动应用。
-
-如果仍然为空（Redmi / HyperOS / MIUI 常见），去系统里手动放行一次：
-
-> 设置 → 应用设置 → 应用管理 →「你确定？」→ 权限 → 打开「读取应用列表 / 获取应用列表」。
+覆盖 7 种口令词 × 5 种格子数 × 200 轮随机生成。
 
 ---
 
-## 核心设计：摩擦到底从哪来
+## 技术栈
 
-这是整个项目里唯一值得你想清楚的部分。`Config.kt` 的 `Maze` 对象只有一百来行，但每个决定都有取舍。
+- **Kotlin 2.0.21** + **Jetpack Compose**（Material 3）
+- 单 Activity，两个页面，用状态变量做路由，不引 Navigation 库
+- 数据层只有 `SharedPreferences`，没有 Room / DataStore
+- 零第三方依赖（除 AndroidX）
+- 构建：AGP 8.7.3 / Gradle 8.10.2 / `compileSdk 35` / `minSdk 26`
 
-### 机制一：路径格用口令词，干扰格用形近词
-
-```
-口令词 = 番茄
-这一层的 9 个格子：
-  番茄小站   番茄计划   那个番茄
-  南瓜       真番茄     ★番茄
-  番茄派     小番茄     茄
-```
-
-为什么不是「随机猜哪个文件夹」？
-
-因为**纯猜会让人卡死**。卡死的结局不是「我不玩游戏了」，而是「我卸载这个破 App」。摩擦应该来自「需要集中注意力」，不能来自「运气」。
-
-形近词的设计让摩擦变成**视觉搜索成本**：你必须在一堆 `番茄X` 和 `X番茄` 里，一眼锁定完全一致的那一个。你总能找到，只是要花 3~5 秒。这个成本刚好。
-
-### 机制二：点错就整层重新洗牌
-
-位置一变，肌肉记忆就废了。你不能靠「第三行第二个」这种记忆通关，每次都得重新看。
-
-代价是：连续点错两次会很烦。**这是故意的**，但也是风险点——如果实测发现太烦，把 `delay(650)` 调短、或者允许点错不洗牌，都是合理的调节。
-
-### 机制三：越常想开，门越厚
-
-```kotlin
-totalDepth = 基础层数 + min(今天已想开次数, 5)
-```
-
-今天是第一次想开 → 3 层。今天已经想开 4 次了 → 7 层。
-
-这条是整个设计的灵魂。固定层数会被适应（第三次开始你就不觉得难了），**递增层数不会**——你越想开，成本越高，这是唯一能跟「习惯化」对抗的机制。
-
-上限设 5 是因为：不封顶的话，重度使用那天你会穿 20 层，然后愤怒卸载。
-
-### 机制四：最后一关三重门
-
-```
-冷静倒计时 10 秒  →  按住 3 秒不松手  →  屏幕上写着你自己的问题
-```
-
-三个叠加的效果是：**从「点一下」变成「持续做一组动作」**。
-
-人在冲动的时候能完成一次点击，但很难完成「等 10 秒 + 按住 3 秒 + 读一句自己写的话」。冲动的时间尺度是 1 秒级的，你把动作拉长到 13 秒，冲动就散了。
-
-那个问题是你自己填的，默认是「现在是几点？这件事真的比它更重要吗？」。**换成对你真正有效的**，比如「你今天说要写的代码写完了吗」。
+整个 App 大约 1200 行 Kotlin，其中真正的「创意」集中在 `Config.kt` 的 `Maze` 对象里，不到 100 行。
 
 ---
 
-## 三个你应该自己动手改的地方
+## 免责声明
 
-我故意把可调参数都放在明显的位置，别只是复制粘贴。
+这是一个个人自律工具，**不能替代医疗或心理治疗**。如果你发现自己无法控制使用手机的程度并已影响正常生活，请寻求专业帮助。
 
-### 1. 改摩擦强度（最简单，先练手）
-
-`Config.kt` 的 `Store` 里：
-
-```kotlin
-fun baseDepth(c: Context): Int = sp(c).getInt("depth", 3)   // 默认 3 层
-fun calmSec(c: Context): Int = sp(c).getInt("calm", 10)     // 默认冷静 10 秒
-```
-
-`MazeScreen.kt` 里控制格子数量：
-
-```kotlin
-val cellCount = when {
-    depth <= 2 -> 6
-    depth <= 4 -> 9
-    else -> 12
-}
-```
-
-把它改成 `depth <= 2 -> 9, else -> 15`，感受一下难度曲线怎么变。**改完装到手机上真玩一次**，别只看代码。
-
-### 2. 换干扰词池
-
-`Config.kt` 里：
-
-```kotlin
-private val SUFFIX = listOf("钟", "酱", "汁", ...)
-private val PREFIX = listOf("小", "老", "大", ...)
-```
-
-如果你的口令词是英文（比如 `focus`），中缀后缀规则会产生 `focus钟` 这种怪东西。给英文加一组规则：
-
-```kotlin
-private val EN_SUFFIX = listOf("s", "ing", "ed", "er", "ly", "box", "app")
-```
-
-想清楚：什么词会让「找到它」变得难但不至于不可能？
-
-### 3. 加一个你自己想要的功能
-
-建议加这个：**「每天第一次打开免费」**。
-
-逻辑：如果 `Store.todayCount(c) == 0`，就让 `totalDepth` 返回 1（直接进最后一关）。理由是人每天第一次想放松是合理的，不该被罚；但第二次开始就该有阻力。
-
-改哪里：`Maze.totalDepth()`。改完自己测一遍边界——`todayCount = 0` 时是不是真的 1 层？
+本项目不对任何人因使用本工具产生的后果负责——包括但不限于「因为找不到口令词而卸载」。
 
 ---
 
-## 下一版：堵住桌面那个洞
+## License
 
-这是这个工具「有没有用」的分水岭。思路是 `AccessibilityService`，代码骨架：
+[MIT](LICENSE) © 2026 dont-open contributors
 
-```kotlin
-class GuardService : AccessibilityService() {
-    override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val pkg = event.packageName?.toString() ?: return
-        if (pkg !in Store.guarded(this)) return
-        if (pkg == packageName) return
-
-        // 用户从桌面点开了受管应用 → 立刻把他拽回迷宫入口
-        startActivity(Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra("forceGate", pkg)
-        })
-    }
-    override fun onInterrupt() {}
-}
-```
-
-配套要做的：
-1. `res/xml/accessibility_service_config.xml` 声明 `typeWindowStateChanged`
-2. Manifest 里注册 service + `BIND_ACCESSIBILITY_SERVICE` 权限
-3. Manifest 里加 `<queries>` 或保留 `QUERY_ALL_PACKAGES`
-4. 首次启动引导用户去「设置 → 无障碍」手动开启
-
-**注意这里有个真实的坑**：上面的写法会让游戏先闪一下再被拽回来，体验很生硬。更好的做法是用 `SYSTEM_ALERT_WINDOW` 权限画一个遮罩层直接盖在游戏上面。这个坑你自己踩一遍会记得很牢。
-
-还有一个更狠的思路：**让这个 App 自己变成桌面（Launcher）**。给 Activity 加 `category.HOME` 的 intent-filter，系统会问你要不要用它当桌面。这样游戏图标根本不在你的桌面上，只能走迷宫。代价是你要把桌面重写一遍——但「藏起来」的效果比任何拦截都彻底。
-
----
-
-## 已知问题（都别当成 bug 修，是取舍）
-
-| 问题 | 为什么这样 | 什么时候修 |
-|---|---|---|
-| 桌面直接启动绕过了 | v1 范围就是迷宫本体 | v2 无障碍 |
-| 今天次数一进迷宫就 +1，没真的开也算 | 「想开」这个动作已经发生了，就该计入 | 不用修 |
-| 层数一多，点错重洗很烦 | 故意的，但需要真机调参 | 玩三天后看数据 |
-| 图标是运行时加载的，列表滚动会有点卡 | MVP 没做图片缓存 | 应用少的话不用管 |
-| 没做应用列表的「系统应用过滤」 | 宁可多显示也别漏 | 感觉乱再加 |
-
----
-
-## 最后
-
-先把 `prototype/index.html` 玩三轮，然后回答自己一个问题：
-
-**如果你是用户，玩完第三轮，你是想继续用，还是想卸载？**
-
-如果答案是「想卸载」——回来告诉我，我们改设计，不是改代码。
+如果这个思路帮到了你，欢迎拿去改成你自己的版本。**最有效的摩擦，一定是你自己设计的那个。**

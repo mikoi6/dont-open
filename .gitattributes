@@ -1,0 +1,15 @@
+# 统一换行符，避免跨平台 diff 噪音
+* text=auto eol=lf
+
+# 二进制文件，不做换行符转换
+*.png binary
+*.jpg binary
+*.jar binary
+*.apk binary
+*.aab binary
+
+# 这几个文件对换行符敏感：
+# gradlew 必须 LF，否则 macOS/Linux 上执行会报 "bad interpreter"
+gradlew text eol=lf
+# Windows 批处理必须 CRLF
+*.bat text eol=crlf

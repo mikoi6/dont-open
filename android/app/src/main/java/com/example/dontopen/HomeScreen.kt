@@ -1,5 +1,8 @@
 package com.example.dontopen
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +26,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +46,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.Image
 import androidx.core.graphics.drawable.toBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
@@ -50,6 +57,21 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
     var guarded by remember { mutableStateOf(Store.guarded(ctx)) }
     var showPicker by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+
+    // 无障碍服务 / 悬浮窗开关都在系统设置里改，回来时要刷新一次状态
+    var guardOn by remember { mutableStateOf(GuardService.isEnabled(ctx)) }
+    var overlayOn by remember { mutableStateOf(GuardService.isOverlayEnabled(ctx)) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, e ->
+            if (e == Lifecycle.Event.ON_RESUME) {
+                guardOn = GuardService.isEnabled(ctx)
+                overlayOn = GuardService.isOverlayEnabled(ctx)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // 今日状态（进入迷宫后会变，所以每次回首页重新读）
     val todayCount = Store.todayCount(ctx)
@@ -80,6 +102,33 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
                 text = "把挡不住的东西，塞进很深的地方。",
                 color = TextDim,
                 fontSize = 14.sp
+            )
+        }
+
+        // ---------- 桌面拦截状态 ----------
+        item {
+            Spacer(Modifier.height(8.dp))
+            GuardCard(
+                enabled = guardOn,
+                overlayOn = overlayOn,
+                onEnableAccessibility = {
+                    runCatching {
+                        ctx.startActivity(
+                            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                },
+                onEnableOverlay = {
+                    runCatching {
+                        ctx.startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:${ctx.packageName}")
+                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }
             )
         }
 
@@ -184,7 +233,7 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
         item {
             Spacer(Modifier.height(16.dp))
             Text(
-                text = "当前版本只管控「从这里进入」。\n从手机桌面直接点图标仍然可以绕过 —— 用无障碍服务拦截是下一版的事。",
+                text = "拦截开启后，会有一条常驻通知用来保活（防止系统回收）。\n它只检测前台窗口变化，不读取、不上传任何内容。",
                 color = TextDim.copy(alpha = 0.6f),
                 fontSize = 11.sp,
                 lineHeight = 16.sp
@@ -203,6 +252,131 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
                 Store.setGuarded(ctx, guarded)
             }
         )
+    }
+}
+
+@Composable
+private fun GuardCard(
+    enabled: Boolean,
+    overlayOn: Boolean,
+    onEnableAccessibility: () -> Unit,
+    onEnableOverlay: () -> Unit
+) {
+    val ready = enabled && overlayOn
+    val on = if (ready) OkGreen else Danger
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(on.copy(alpha = 0.10f))
+            .border(1.dp, on.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(9.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(on)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (ready) "桌面拦截已就绪" else "桌面拦截未就绪",
+                color = TextMain,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            if (ready) "从手机桌面直接点开受管应用，也会被拉回迷宫。"
+            else "开启下面两项后，从桌面点开受管应用也会被拦回迷宫。",
+            color = TextDim,
+            fontSize = 12.sp,
+            lineHeight = 17.sp
+        )
+
+        if (!enabled) {
+            Spacer(Modifier.height(14.dp))
+            PrereqRow(ok = false, label = "无障碍服务", action = "去开启", onClick = onEnableAccessibility)
+        } else {
+            Spacer(Modifier.height(14.dp))
+            PrereqRow(ok = true, label = "无障碍服务", action = "已开启", onClick = null)
+        }
+
+        Spacer(Modifier.height(8.dp))
+        PrereqRow(ok = overlayOn, label = "显示在其他应用上层", action = if (overlayOn) "已授权" else "去授权", onClick = if (overlayOn) null else onEnableOverlay)
+
+        if (!ready) {
+            Spacer(Modifier.height(14.dp))
+            HyperOsChecklist()
+        }
+    }
+}
+
+@Composable
+private fun HyperOsChecklist() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Ink.copy(alpha = 0.6f))
+            .padding(14.dp)
+    ) {
+        Text("MIUI / HyperOS 额外要做的", color = TextMain, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "这些 ROM 会反复关闭无障碍服务，开完上面两项后，还要在系统里逐个确认：",
+            color = TextDim,
+            fontSize = 11.sp,
+            lineHeight = 16.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        TipLine("自启动", "设为「允许」")
+        TipLine("后台弹出界面", "设为「允许」")
+        TipLine("省电策略", "设为「无限制」")
+        TipLine("最近任务", "长按本应用 → 锁定")
+    }
+}
+
+@Composable
+private fun TipLine(k: String, v: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(k, color = TextDim, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Text(v, color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun PrereqRow(ok: Boolean, label: String, action: String, onClick: (() -> Unit)?) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(if (ok) OkGreen else TextDim.copy(alpha = 0.4f))
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(label, color = TextMain, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        if (onClick != null) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Accent)
+                    .clickable(onClick = onClick)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(action, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            }
+        } else {
+            Text(action, color = if (ok) OkGreen else TextDim, fontSize = 12.sp)
+        }
     }
 }
 

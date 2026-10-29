@@ -1,5 +1,6 @@
 package com.example.dontopen
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -52,20 +53,41 @@ sealed interface Screen {
 }
 
 class MainActivity : ComponentActivity() {
+
+    // 被无障碍服务拦回来的目标应用（非 null 时直接进迷宫）
+    private val intercepted = mutableStateOf<AppEntry?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        routeFromIntent(intent)
         setContent {
             DontOpenTheme {
                 Surface(color = Ink, modifier = Modifier.fillMaxSize()) {
-                    Root()
+                    val target = intercepted.value
+                    Root(
+                        interceptedApp = target,
+                        onInterceptedDone = { intercepted.value = null }
+                    )
                 }
             }
         }
     }
+
+    // singleTask + 拦截再进：已在前台/后台时，复用同一个实例走 onNewIntent
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        routeFromIntent(intent)
+    }
+
+    private fun routeFromIntent(intent: Intent?) {
+        val pkg = intent?.getStringExtra(GuardService.EXTRA_PKG) ?: return
+        val app = resolveApp(this, pkg) ?: return
+        intercepted.value = app
+    }
 }
 
 @Composable
-fun Root() {
+fun Root(interceptedApp: AppEntry?, onInterceptedDone: () -> Unit) {
     val ctx = LocalContext.current
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
 
@@ -77,6 +99,11 @@ fun Root() {
         allApps = withContext(Dispatchers.IO) { loadInstalledApps(ctx) }
     }
 
+    // 被拦回时，直接跳进对应应用的迷宫
+    LaunchedEffect(interceptedApp) {
+        if (interceptedApp != null) screen = Screen.Maze(interceptedApp)
+    }
+
     when (val s = screen) {
         Screen.Home -> HomeScreen(
             allApps = allApps,
@@ -85,7 +112,10 @@ fun Root() {
 
         is Screen.Maze -> MazeScreen(
             app = s.app,
-            onBack = { screen = Screen.Home }
+            onBack = {
+                screen = Screen.Home
+                if (s.app == interceptedApp) onInterceptedDone()
+            }
         )
     }
 }

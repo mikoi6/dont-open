@@ -65,6 +65,14 @@ object Store {
         sp(c).edit().putString("countDate", today()).putInt("count", n).apply()
         return n
     }
+
+    // ---- v2：本次会话放行的受管应用包名（穿过迷宫后写入，切走即失效）----
+    fun unlockedPkg(c: Context): String? = sp(c).getString("unlocked", null)
+    fun setUnlockedPkg(c: Context, pkg: String?) {
+        sp(c).edit().apply {
+            if (pkg == null) remove("unlocked") else putString("unlocked", pkg)
+        }.apply()
+    }
 }
 
 /**
@@ -160,6 +168,13 @@ fun launchApp(ctx: Context, pkg: String): Boolean {
         false
     }
 }
+
+/** 按包名解析应用（拦截时用，拿不到就返回 null） */
+fun resolveApp(ctx: Context, pkg: String): AppEntry? = runCatching {
+    val pm = ctx.packageManager
+    val info = pm.getApplicationInfo(pkg, 0)
+    AppEntry(pkg, pm.getApplicationLabel(info).toString())
+}.getOrNull()
 
 /** 列出所有有启动入口的应用（要在 IO 线程调用） */
 fun loadInstalledApps(ctx: Context): List<AppEntry> {

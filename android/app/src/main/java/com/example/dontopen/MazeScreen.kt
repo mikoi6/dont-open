@@ -105,6 +105,7 @@ fun MazeScreen(app: AppEntry, onBack: () -> Unit) {
             todayCount = enteredCount,
             onCancel = onBack,
             onOpen = {
+                Store.setUnlockedPkg(ctx, app.pkg)  // 放行本次会话，避免被拦回死循环
                 launchApp(ctx, app.pkg)
                 onBack()
             }

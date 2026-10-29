@@ -9,6 +9,16 @@
 
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- v2：遮罩 + 后台拉起前台 Activity 需要「显示在其他应用上层」权限 -->
+    <uses-permission
+        android:name="android.permission.SYSTEM_ALERT_WINDOW"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- v2 保活：前台服务 + 常驻通知 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Android 11+ 包可见性：声明需要看见所有带桌面启动入口的应用 -->
     <queries>
         <intent>
@@ -29,6 +39,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.DontOpen"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -36,6 +47,30 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- v2：桌面拦截。用无障碍服务监听前台窗口，把受管应用拦回迷宫 -->
+        <service
+            android:name=".GuardService"
+            android:exported="false"
+            android:label="@string/accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- v2 保活：伴随无障碍服务的前台服务，防止进程被回收后连带禁用无障碍 -->
+        <service
+            android:name=".KeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="keep the accessibility guard process alive" />
+        </service>
 
     </application>
 

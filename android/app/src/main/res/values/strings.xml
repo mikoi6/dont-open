@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">你确定？</string>
+    <string name="accessibility_label">桌面拦截</string>
+    <string name="accessibility_desc">在你从桌面打开受管控的应用时，把你拉回迷宫，给冲动一点摩擦。它只检测前台窗口变化，不读取、不上传你的任何内容。</string>
 </resources>

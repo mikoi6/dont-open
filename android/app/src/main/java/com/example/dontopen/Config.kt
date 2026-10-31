@@ -63,7 +63,32 @@ object Store {
     fun bumpTodayCount(c: Context): Int {
         val n = todayCount(c) + 1
         sp(c).edit().putString("countDate", today()).putInt("count", n).apply()
+        bumpDailyStat(c, today())
         return n
+    }
+
+    // ---- 主题：dark | light ----
+    fun themeMode(c: Context): String = sp(c).getString("theme", "dark") ?: "dark"
+    fun setThemeMode(c: Context, v: String) = sp(c).edit().putString("theme", v).apply()
+
+    // ---- 每日统计历史：存成 "yyyy-MM-dd:count,..." 这种，裁剪保留最近 30 天 ----
+    fun dailyStats(c: Context): Map<String, Int> {
+        val raw = sp(c).getString("dailyStats", "") ?: ""
+        return raw.split(',').mapNotNull { part ->
+            val i = part.lastIndexOf(':')
+            if (i <= 0) return@mapNotNull null
+            val date = part.substring(0, i)
+            val n = part.substring(i + 1).toIntOrNull() ?: return@mapNotNull null
+            date to n
+        }.toMap()
+    }
+
+    private fun bumpDailyStat(c: Context, date: String) {
+        val stats = dailyStats(c).toMutableMap()
+        stats[date] = (stats[date] ?: 0) + 1
+        val sorted = stats.entries.sortedBy { it.key }.takeLast(30)
+        val s = sorted.joinToString(",") { "${it.key}:${it.value}" }
+        sp(c).edit().putString("dailyStats", s).apply()
     }
 
     // ---- v2：本次会话放行的受管应用包名（穿过迷宫后写入，切走即失效）----

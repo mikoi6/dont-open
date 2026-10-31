@@ -51,12 +51,18 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
-fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
+fun HomeScreen(
+    allApps: List<AppEntry>,
+    onEnter: (AppEntry) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenStats: () -> Unit
+) {
     val ctx = LocalContext.current
 
     var guarded by remember { mutableStateOf(Store.guarded(ctx)) }
     var showPicker by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<AppEntry?>(null) }
 
     // 无障碍服务 / 悬浮窗开关都在系统设置里改，回来时要刷新一次状态
     var guardOn by remember { mutableStateOf(GuardService.isEnabled(ctx)) }
@@ -90,19 +96,31 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
 
         // ---------- 标题 ----------
         item {
-            Text(
-                text = "你确定要\n打开吗",
-                color = TextMain,
-                fontSize = 38.sp,
-                lineHeight = 42.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "把挡不住的东西，塞进很深的地方。",
-                color = TextDim,
-                fontSize = 14.sp
-            )
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "你确定要\n打开吗",
+                        color = TextMain,
+                        fontSize = 38.sp,
+                        lineHeight = 42.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "把挡不住的东西，塞进很深的地方。",
+                        color = TextDim,
+                        fontSize = 14.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onOpenSettings)
+                        .padding(8.dp)
+                ) {
+                    Text("⚙", color = TextDim, fontSize = 22.sp)
+                }
+            }
         }
 
         // ---------- 桌面拦截状态 ----------
@@ -140,6 +158,7 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(CardBg)
+                    .clickable(onClick = onOpenStats)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -153,19 +172,36 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
                         fontSize = 13.sp
                     )
                 }
-                Text(
-                    text = "$planDepth",
-                    color = Accent,
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "$planDepth",
+                        color = Accent,
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text("查看历史 →", color = TextDim, fontSize = 11.sp)
+                }
             }
         }
 
         // ---------- 受管应用 ----------
         item {
             Spacer(Modifier.height(8.dp))
-            Text("受管控的应用", color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("受管控的应用", color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                if (mine.isNotEmpty()) {
+                    Text(
+                        text = if (editing) "完成" else "编辑",
+                        color = Accent,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { editing = !editing }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
         }
 
         if (mine.isEmpty()) {
@@ -183,7 +219,12 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
             }
         } else {
             items(mine, key = { it.pkg }) { app ->
-                GuardedRow(app) { onEnter(app) }
+                GuardedRow(
+                    app = app,
+                    editing = editing,
+                    onClick = { onEnter(app) },
+                    onDelete = { pendingDelete = app }
+                )
             }
         }
 
@@ -200,33 +241,6 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
             ) {
                 Text("＋  把应用藏起来", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }
-        }
-
-        // ---------- 设置 ----------
-        item {
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { showSettings = !showSettings }
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(if (showSettings) "▾" else "▸", color = TextDim, fontSize = 13.sp)
-                Spacer(Modifier.width(8.dp))
-                Text("设置", color = TextDim, fontSize = 13.sp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "口令「${Store.keyword(ctx)}」· 基础 ${Store.baseDepth(ctx)} 层",
-                    color = TextDim.copy(alpha = 0.7f),
-                    fontSize = 12.sp
-                )
-            }
-        }
-
-        if (showSettings) {
-            item { SettingsPanel() }
         }
 
         // ---------- 诚实声明 ----------
@@ -252,6 +266,55 @@ fun HomeScreen(allApps: List<AppEntry>, onEnter: (AppEntry) -> Unit) {
                 Store.setGuarded(ctx, guarded)
             }
         )
+    }
+
+    // 删除确认弹窗
+    pendingDelete?.let { app ->
+        Dialog(onDismissRequest = { pendingDelete = null }) {
+            Surface(
+                color = CardBg,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(22.dp)) {
+                    Text("移除「${app.label}」？", color = TextMain, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("只是从受管控列表里删掉，应用本身不会卸载。之后想再加回来随时可以。", color = TextDim, fontSize = 13.sp, lineHeight = 18.sp)
+                    Spacer(Modifier.height(18.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(CardBg)
+                                .border(1.dp, TextDim.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .clickable { pendingDelete = null }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("算了", color = TextDim, fontSize = 14.sp)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Danger)
+                                .clickable {
+                                    guarded = guarded - app.pkg
+                                    Store.setGuarded(ctx, guarded)
+                                    if (Store.unlockedPkg(ctx) == app.pkg) Store.setUnlockedPkg(ctx, null)
+                                    if (guarded.isEmpty()) editing = false
+                                    pendingDelete = null
+                                }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("移除", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -381,7 +444,7 @@ private fun PrereqRow(ok: Boolean, label: String, action: String, onClick: (() -
 }
 
 @Composable
-private fun GuardedRow(app: AppEntry, onClick: () -> Unit) {
+private fun GuardedRow(app: AppEntry, editing: Boolean, onClick: () -> Unit, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -396,9 +459,25 @@ private fun GuardedRow(app: AppEntry, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(app.label, color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(2.dp))
-            Text("进入需要穿过多层文件夹", color = TextDim, fontSize = 12.sp)
+            Text(
+                if (editing) "点击右侧按钮移除管控" else "进入需要穿过多层文件夹",
+                color = TextDim,
+                fontSize = 12.sp
+            )
         }
-        Text("→", color = Accent, fontSize = 18.sp)
+        if (editing) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Danger.copy(alpha = 0.15f))
+                    .clickable(onClick = onDelete)
+                    .padding(horizontal = 12.dp, vertical = 7.dp)
+            ) {
+                Text("删除", color = Danger, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+        } else {
+            Text("→", color = Accent, fontSize = 18.sp)
+        }
     }
 }
 
@@ -432,112 +511,6 @@ fun AppIcon(pkg: String, size: Dp) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun SettingsPanel() {
-    val ctx = LocalContext.current
-
-    var keyword by remember { mutableStateOf(Store.keyword(ctx)) }
-    var depth by remember { mutableStateOf(Store.baseDepth(ctx)) }
-    var calm by remember { mutableStateOf(Store.calmSec(ctx)) }
-    var reason by remember { mutableStateOf(Store.reason(ctx)) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(CardBg)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text("口令词", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        Text(
-            "每层里只有一个文件夹叫这个名字，其余都是形近的假货。找它，才能往下走。",
-            color = TextDim,
-            fontSize = 11.sp,
-            lineHeight = 15.sp
-        )
-        OutlinedTextField(
-            value = keyword,
-            onValueChange = {
-                keyword = it
-                if (it.isNotBlank()) Store.setKeyword(ctx, it.trim())
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Accent,
-                unfocusedBorderColor = TextDim.copy(alpha = 0.4f)
-            )
-        )
-
-        Stepper("基础层数", depth, 1, 8, "层") {
-            depth = it
-            Store.setBaseDepth(ctx, it)
-        }
-
-        Stepper("最后一关冷静", calm, 3, 30, "秒") {
-            calm = it
-            Store.setCalmSec(ctx, it)
-        }
-
-        Text("最后一关会问你", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        OutlinedTextField(
-            value = reason,
-            onValueChange = {
-                reason = it
-                Store.setReason(ctx, it)
-            },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Accent,
-                unfocusedBorderColor = TextDim.copy(alpha = 0.4f)
-            )
-        )
-    }
-}
-
-@Composable
-private fun Stepper(
-    label: String,
-    value: Int,
-    min: Int,
-    max: Int,
-    unit: String,
-    onChange: (Int) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, color = TextMain, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        StepBtn("−") { if (value > min) onChange(value - 1) }
-        Text(
-            "$value$unit",
-            color = TextMain,
-            fontSize = 15.sp,
-            modifier = Modifier
-                .width(60.dp)
-                .padding(horizontal = 8.dp)
-        )
-        StepBtn("+") { if (value < max) onChange(value + 1) }
-    }
-}
-
-@Composable
-private fun StepBtn(text: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(34.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Ink)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text, color = Accent, fontSize = 17.sp, fontWeight = FontWeight.Bold)
     }
 }
 

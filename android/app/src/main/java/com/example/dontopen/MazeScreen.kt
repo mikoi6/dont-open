@@ -244,6 +244,9 @@ private fun FolderCell(
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(if (isWrong) 0.92f else 1f, label = "scale")
+    // Canvas 的 onDraw 不是 composable 上下文，先把颜色抓成普通局部变量
+    val accent = Accent
+    val danger = Danger
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -253,10 +256,10 @@ private fun FolderCell(
                 scaleY = scale
             }
             .clip(RoundedCornerShape(14.dp))
-            .background(if (isWrong) Danger.copy(alpha = 0.14f) else CardBg)
+            .background(if (isWrong) danger.copy(alpha = 0.14f) else CardBg)
             .border(
                 width = 1.dp,
-                color = if (isWrong) Danger else Color.Transparent,
+                color = if (isWrong) danger else Color.Transparent,
                 shape = RoundedCornerShape(14.dp)
             )
             .clickable(enabled = enabled, onClick = onClick)
@@ -273,8 +276,8 @@ private fun FolderCell(
             val tabH = h * 0.18f
             val r = 7.dp.toPx()
 
-            val bodyColor = if (isWrong) Danger.copy(alpha = 0.42f) else Accent.copy(alpha = 0.26f)
-            val tabColor = if (isWrong) Danger.copy(alpha = 0.62f) else Accent.copy(alpha = 0.44f)
+            val bodyColor = if (isWrong) danger.copy(alpha = 0.42f) else accent.copy(alpha = 0.26f)
+            val tabColor = if (isWrong) danger.copy(alpha = 0.62f) else accent.copy(alpha = 0.44f)
 
             // 顶部小标签（画高一点，下半部分被主体盖住，看起来就连成一体了）
             drawRoundRect(
@@ -295,7 +298,7 @@ private fun FolderCell(
         Spacer(Modifier.height(8.dp))
         Text(
             text = text,
-            color = if (isWrong) Danger else TextMain,
+            color = if (isWrong) danger else TextMain,
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
